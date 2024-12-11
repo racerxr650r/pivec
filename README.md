@@ -1,2 +1,2 @@
 # pivec
-Simple user mode app to configure the Raspberry PI composite video controller
+Simple user mode app to configure the Raspberry PI composite video controller. Use this application to disable the color burst and modulated chroma signal. It solves the problem described in this [thread on the raspberry pi forums](https://forums.raspberrypi.com/viewtopic.php?t=248217). Use this if you are using an old monochrome CRT with composite input and you want higher resolution without the annoying moving dithering.
