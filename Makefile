@@ -62,7 +62,7 @@ permission:
 	sudo udevadm control --reload-rules
 # Remove the rule that puts /dev/uinput in the uinput group
 unpermission:
-	-deluser $$(whoami) kmem
+	-sudo deluser $$(whoami) kmem
 	sudo rm -f $(UDEVDIR)/mem.rules
 	sudo udevadm control --reload-rules
 # Setup daemon launched by systemd
