@@ -1,0 +1,2 @@
+# kmem group read/write access to /dev/mem
+SUBSYSTEM=="mem", KERNEL=="mem|kmem|port", GROUP="kmem", MODE="0660"
