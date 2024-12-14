@@ -70,7 +70,7 @@ unpermission:
 # Setup daemon launched by systemd
 boot: install
 	cp $(TARGET).service.src $(TARGET).service
-	echo ExecStart=$(BINDIR)/serkey $(OPTIONS) | tee -a $(TARGET).service
+	echo ExecStart=$(BINDIR)/$(TARGET) $(OPTIONS) | tee -a $(TARGET).service
 	sudo mv $(TARGET).service $(SYSDDIR)
 	systemctl start $(TARGET)
 	systemctl enable $(TARGET)
