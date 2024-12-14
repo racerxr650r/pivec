@@ -177,36 +177,40 @@ int main(int argc, char *argv[])
  */
 local void parseCommandLine(int argc, char *argv[])
 {
-   // For each command line argument...
-   for(int i=1;i<=argc-1;++i)
-   {
-      // If command line switch "-" character...
-      if(argv[i][0]=='-')
+   // No flags provided...
+   if(argc==1)
+      appConfig.verbose = true;
+   else
+      // For each command line argument...
+      for(int i=1;i<=argc-1;++i)
       {
-         // Decode the command line switch and apply...
-         switch(argv[i][1])
+         // If command line switch "-" character...
+         if(argv[i][0]=='-')
          {
-            case 'c':
-               appConfig.color_set = true;
-               ++i;
-               // If valid color setting...
-               if(!strcmp(argv[i],"on"))
-                  appConfig.color = true;
-               else if(!strcmp(argv[i],"off"))
-                  appConfig.color = false;
-               break;
-            case 'v':
-               appConfig.verbose = true;
-               break;
-            case 'h':
-            case '?':
-               exitApp(NULL, true, EXIT_SUCCESS);
-               break;
-            default:
-               exitApp("Unknown switch", true, EXIT_ERROR);
+            // Decode the command line switch and apply...
+            switch(argv[i][1])
+            {
+               case 'c':
+                  appConfig.color_set = true;
+                  ++i;
+                  // If valid color setting...
+                  if(!strcmp(argv[i],"on"))
+                     appConfig.color = true;
+                  else if(!strcmp(argv[i],"off"))
+                     appConfig.color = false;
+                  break;
+               case 'v':
+                  appConfig.verbose = true;
+                  break;
+               case 'h':
+               case '?':
+                  exitApp(NULL, true, EXIT_SUCCESS);
+                  break;
+               default:
+                  exitApp("Unknown switch", true, EXIT_ERROR);
+            }
          }
       }
-   }
 }
 
 /*
@@ -217,15 +221,16 @@ local void displayUsage(FILE *output_stream)
    fprintf(output_stream, "Usage: pivec [OPTION]\n\n\r"
           "Simple user mode app to configure the Raspberry PI composite video controller.\n\r"
           "Use this application to disable the color burst and modulated chroma signal.\n\r"
-          "It solves the problem described in this thread on the raspberry pi forums. Use\n\r"
-          "this if you are using an old monochrome CRT with composite input and you want\n\r"
-          "higher resolution without the annoying moving dithering. This app has been\n\r"
-          "tested with the Raspberry PI 4 and PI zero 2w. It's expected to work with the\n\r"
-          "PI 1, 2, 3, zero. I expect it will not work with the PI 5 without some\n\r"
-          "modification since this feature has been moved to the new PI southbridge.\n\r"
+          "This application is helpful if you are using an old monochrome CRT with composite\n\r"
+          "input and you want higher resolution without the annoying dithering. This\n\r"
+          "app has been tested with the Raspberry PI 4 and PI zero 2w. It's expected to work\n\r"
+          "with the PI 1, 2, 3, zero. I expect it will not work with the PI 5 without some\n\r"
+          "modification since this feature has been moved to the new PI southbridge.\n\r\n\r"
           "OPTIONS:\n\r"
           "  -c   on|off\n\r"
-          "       Turn the color burst and chrominance on or off (default:off)\n\r");
+          "       Turn the color burst and chrominance on or off (default:off)\n\r"
+          "  -h/? Display this usage information\n\r"
+          "  -v   Verbose mode, displays configuration status\n\r");
 }
 
 /*

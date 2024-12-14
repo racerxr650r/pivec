@@ -83,7 +83,7 @@ unboot:
 # Install prereqeuisites
 prereqs:
 	sudo apt update
-	sudo apt install libraspberrypi-dev raspberrypi-kernel-headers
+	sudo apt install build-essential libraspberrypi-dev raspberrypi-kernel-headers
 # Clean up all generated files
 clean:
 	rm -rf $(BUILD_DIR)
