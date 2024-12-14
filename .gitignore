@@ -50,3 +50,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+build/pivec
+dt.txt
+.vscode/settings.json

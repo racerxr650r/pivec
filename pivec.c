@@ -19,22 +19,16 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */ 
-#include <linux/uinput.h>
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/wait.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <signal.h>
+#include <sys/mman.h>
+#include <bcm_host.h>
 
 // Macros *********************************************************************
 // I've never liked how the static keyword is overloaded in C
@@ -42,24 +36,66 @@
 #define local        static
 #define persistent   static
 
+#ifndef EXIT_SUCCESS
+#define EXIT_SUCCESS 0
+#endif
+#ifndef EXIT_ERROR
+#define EXIT_ERROR   -1
+#endif
+
 #define LOG(fmt_str,...)	do{\
    if(appConfig.verbose) \
 	   fprintf(stdout,fmt_str, ##__VA_ARGS__); \
 }while(0)
 
 // Constants ******************************************************************
+#define VEC_REG_OFFSET  0x00c13000
+#define VEC_REG_LENGTH  0x1000
+#define VEC_REVID       0x40
+#define VEC_CONFIG0     0x41
+#define CHRDIS          0x00000080
+#define CHRDIS_BIT      7
+#define BURDIS          0x00000100
+#define BURDIS_BIT      8
 
 // Data Types *****************************************************************
 // Configuration
 typedef struct CONFIG
 {
-   bool        color, verbose;
+   bool        color_set, color, verbose;
 }config_t;
 
 // Globals ********************************************************
 // Configuration w/default values
-config_t appConfig = {  .color = false,
+config_t appConfig = {  .color_set = false,
+                        .color = false,
                         .verbose = false};
+
+char pi_type[][64] = {  "PI 1 Model A",
+                        "PI 1 Model B",
+                        "PI 1 Model A+",
+                        "PI 1 Model B+",
+                        "PI 2 Model B",
+                        "PI Alpha",
+                        "PI CM 1",
+                        "PI CM 2",
+                        "PI 3 Model B",
+                        "PI Zero",
+                        "PI CM 3",
+                        "PI CUSTOM",
+                        "PI Zero 2w",
+                        "PI 3 Model B+",
+                        "PI 3 Model A+",
+                        "PI FPGA",
+                        "PI CM 3+",
+                        "PI Model 4 B",
+                        "PI 400",
+                        "PI CM 4"};
+char pi_processor[][32] = {   "BCM2835",
+                              "BCM2836",
+                              "BCM2837",
+                              "BCM2838",
+                              "BCM2711"};
 
 // Local function prototypes **************************************************
 local void parseCommandLine(  int argc,      // Total count of arguments
@@ -76,10 +112,63 @@ local void exitApp(  char* error_str,        // Descriptive char string
  */
 int main(int argc, char *argv[])
 {
+   bcm_host_init();
+
    // Parse the command line and setup the config
    parseCommandLine(argc, argv);
 
-   return 0;
+   // Open the /dev/mem device we are about do things...
+   int mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
+   if(mem_fd<0)
+      exitApp("Unable to open /dev/mem. Check that you have permission to read/write this device.",false,-1);
+   LOG("Opened /dev/mem device\n\r");
+
+   // TODO: use https://github.com/jviki/dtree to get the vec address from the device tree
+   void *regs_ptr = mmap(NULL, VEC_REG_LENGTH, PROT_READ | PROT_WRITE, MAP_SHARED, mem_fd, bcm_host_get_peripheral_address() + VEC_REG_OFFSET);
+   if(regs_ptr == MAP_FAILED)
+      exitApp("Unable to the mmap memory",false,EXIT_ERROR);
+   volatile uint32_t *regs = (volatile uint32_t *)regs_ptr;
+   LOG("Mapped the VEC peripheral registers.\n\r");
+
+   // If set color...
+   if(appConfig.color_set)
+   {
+      LOG("Setting color state to ");
+      // If color is to be turned on...
+      if(appConfig.color)
+      {
+         regs[VEC_CONFIG0] = regs[VEC_CONFIG0] & (~CHRDIS & ~BURDIS);
+         LOG("ON\n\r");
+      }
+      // Else color is to be turned off...
+      else
+      {
+         regs[VEC_CONFIG0] = regs[VEC_CONFIG0] | CHRDIS | BURDIS;
+         LOG("OFF\n\r");
+      }
+   }
+
+   // If verbose, display system information
+   LOG("\n\r%s\n\rCPU:     %s\n\r",pi_type[bcm_host_get_model_type()],pi_processor[bcm_host_get_processor_id()]);
+   uint32_t width, height;
+   graphics_get_display_size(0, &width, &height);
+   LOG("Display: %dx%d\n\r",width,height);
+   LOG("Peripheral Address: 0x%08x\n\r",bcm_host_get_peripheral_address());
+   LOG("Peripheral Size:    0x%08x\n\r",bcm_host_get_peripheral_size());
+   LOG("VEC address:        0x%08x\n\r",bcm_host_get_peripheral_address()+VEC_REG_OFFSET);
+   LOG("VEC config0:        0x%08x\n\r",regs[VEC_CONFIG0]);
+   LOG("VEC Chroma:         %s\n\r",(regs[VEC_CONFIG0] & CHRDIS)>>CHRDIS_BIT?"off":"on");
+   LOG("VEC Color Burst:    %s\n\r",(regs[VEC_CONFIG0] & BURDIS)>>BURDIS_BIT?"off":"on");
+
+   if(munmap(regs_ptr, VEC_REG_LENGTH)<0)
+   {
+      close(mem_fd);
+      exitApp("Unable to unmap memory",false,EXIT_ERROR);
+   }
+
+   close(mem_fd);
+   bcm_host_deinit();
+   return EXIT_SUCCESS;
 }
 
 // Program Runtime Functions **************************************************
@@ -94,12 +183,12 @@ local void parseCommandLine(int argc, char *argv[])
       // If command line switch "-" character...
       if(argv[i][0]=='-')
       {
-         int baudrate, databits, stopbits;
-
          // Decode the command line switch and apply...
          switch(argv[i][1])
          {
             case 'c':
+               appConfig.color_set = true;
+               ++i;
                // If valid color setting...
                if(!strcmp(argv[i],"on"))
                   appConfig.color = true;
@@ -111,19 +200,13 @@ local void parseCommandLine(int argc, char *argv[])
                break;
             case 'h':
             case '?':
-               exitApp(NULL, true, 0);
+               exitApp(NULL, true, EXIT_SUCCESS);
                break;
             default:
-               exitApp("Unknown switch", true, -9);
+               exitApp("Unknown switch", true, EXIT_ERROR);
          }
       }
-      // Else update the device path/name 
-      else
-         appConfig.tty = argv[i];
    }
-
-   if(appConfig.tty==NULL)
-      exitApp("No serial device provided", true, -11);
 }
 
 /*

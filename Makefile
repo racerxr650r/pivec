@@ -29,9 +29,11 @@ SYSDDIR = /etc/systemd/system
 # Udev rules directory
 UDEVDIR = /etc/udev/rules.d
 # C compiler command
-CC =		cc
+CC =		gcc
 # Build flags for c files
 CFLAGS =	-O -I/usr/local/include -pedantic -Wall -Wpointer-arith -Wshadow -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wredundant-decls -Wno-long-long
+# Linker Flags
+LFLAGS =	-lbcm_host
 # Application command line options
 OPTIONS = -c off
 
@@ -43,7 +45,7 @@ build:
 	mkdir -p $(BUILD_DIR)
 # Build the app from the .c source
 $(TARGET):		$(TARGET).c
-	$(CC) $(CFLAGS) $(TARGET).c -o $(BUILD_DIR)/$(TARGET)
+	$(CC) $(CFLAGS) $(TARGET).c -o $(BUILD_DIR)/$(TARGET) $(LFLAGS)
 # Run serkey with the provided args
 run:		all
 	$(BUILD_DIR)/$(TARGET) $(OPTIONS)
@@ -78,6 +80,10 @@ unboot:
 	systemctl stop $(TARGET)
 	systemctl disable $(TARGET)
 	sudo rm -f $(SYSDDIR)/$(TARGET).service
+# Install prereqeuisites
+prereqs:
+	sudo apt update
+	sudo apt install libraspberrypi-dev raspberrypi-kernel-headers
 # Clean up all generated files
 clean:
 	rm -rf $(BUILD_DIR)
